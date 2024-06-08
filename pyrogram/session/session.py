@@ -163,14 +163,20 @@ class Session:
         self.ping_task_event.set()
 
         if self.ping_task is not None:
-            await self.ping_task
+            try:
+                await self.ping_task
+            except RuntimeError:
+                pass
 
         self.ping_task_event.clear()
 
         await self.connection.close()
 
         if self.recv_task:
-            await self.recv_task
+            try:
+                await self.recv_task
+            except RuntimeError:
+                pass
 
         if not self.is_media and callable(self.client.disconnect_handler):
             try:
@@ -411,6 +417,9 @@ class Session:
                 if retries == 0:
                     raise e from None
 
+                if isinstance(e, OSError):
+                    self.loop.create_task(self.restart())
+                
                 (log.warning if retries < 2 else log.info)(
                     '[%s] Retrying "%s" due to: %s',
                     Session.MAX_RETRIES - retries + 1,
